@@ -5,31 +5,34 @@
 #include <stdbool.h>
 #include <string.h>
 
-int fd = -1;
-volatile int interrupt_count = 0;
-char inputBuffer[128];
+volatile struct {
+    int fd;
+    int interrupt_count;
+    char inputBuffer[128];
+} IOData;
 
 void sigpoll_callback(int signal) {
-    int bytesRead = read(fd, inputBuffer, sizeof(inputBuffer));
+    int bytesRead = read(IOData.fd, (void *) IOData.inputBuffer, sizeof(IOData.inputBuffer));
     if (bytesRead > 0)
-        printf("%d %s\n", interrupt_count, inputBuffer);
+        printf("%d %s\n", IOData.interrupt_count, IOData.inputBuffer);
 
-    memset(inputBuffer, 0, sizeof(inputBuffer));
-    interrupt_count++;
+    memset((void *) IOData.inputBuffer, 0, sizeof(IOData.inputBuffer));
+    IOData.interrupt_count++;
 }
 
 int main()
 {
-    fd = open("/dev/ttyS0", O_RDWR);
+    IOData.fd = open("/dev/ttyS0", O_RDWR);
 
-    fcntl(fd, F_SETOWN, getpid());
-    fcntl(fd, F_SETFL, O_ASYNC | O_NONBLOCK);
+    fcntl(IOData.fd, F_SETOWN, getpid());
+    fcntl(IOData.fd, F_SETFL, O_ASYNC | O_NONBLOCK);
 
     struct sigaction sa = {0};
     sa.sa_handler = sigpoll_callback;
     sa.sa_flags = 0;
     sigaction(SIGPOLL, &sa, NULL);
 
+    // Put the main thread to sleep and wake for inputs
     while (true)
     {
         sleep(1);
