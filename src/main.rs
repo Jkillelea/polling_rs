@@ -4,6 +4,8 @@ use std::os::raw::*;
 use std::os::unix::io::AsRawFd;
 use std::thread;
 use std::time::Duration;
+use std::env;
+use std::io;
 
 mod imports;
 
@@ -17,9 +19,10 @@ extern fn sigpoll_callback(signal: c_int) {
     }
 }
 
-fn main() {
-    let f = File::open("/dev/ttyS0").unwrap();
-    let fd = f.as_raw_fd();
+fn main() -> io::Result<()> {
+    let fname = env::args().nth(1).unwrap_or("/dev/ttyS0".into());
+    let f     = File::open(fname)?;
+    let fd    = f.as_raw_fd();
 
     unsafe {
         use imports::*;
@@ -44,7 +47,9 @@ fn main() {
         sigaction(SIGIO as i32, &sa, &mut oldsa);
     }
 
+    // Put the main thread to sleep and wait for signals
     loop {
         thread::sleep(Duration::from_secs(1));
     }
 }
+
